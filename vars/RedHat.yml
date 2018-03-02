@@ -1,0 +1,9 @@
+---
+drbdmanage_d:
+  pkgs:
+    - "drbdmanage"
+    - "drbd"
+    - "kmod-drbd"
+  services:
+    - "drbdmanaged.service"
+

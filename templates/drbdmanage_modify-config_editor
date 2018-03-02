@@ -1,0 +1,56 @@
+#!/usr/bin/python
+
+import sys
+from six.moves import configparser
+import six
+
+if six.PY2:
+  ConfigParser = configparser.SafeConfigParser
+else:
+  ConfigParser = configparser.ConfigParser
+
+
+needs_save = False
+
+
+def print_drbdmanageconfig(drbdmanage_config): 
+  for section_name in drbdmanage_config.sections():
+    print('[{}]'.format(section_name))
+    #print('  Options: {}'.format(drbdmanage_config.options(section_name)))
+    for name, value in drbdmanage_config.items(section_name):
+        print('{} = {}'.format(name, value))
+    print('')
+
+
+drbdmanage_config_file = sys.argv[1]
+print("###### drbdmanage_config_file: \"{}\"".format(drbdmanage_config_file))
+
+drbdmanage_config = ConfigParser()
+drbdmanage_config.read(drbdmanage_config_file)
+
+print('###### drbdmanage config from file only')
+print_drbdmanageconfig(drbdmanage_config)
+print('')
+
+
+{% for section, options in drbdmanage.config.items() %}
+{% if section not in [ 'GLOBAL' ] %}
+if(not drbdmanage_config.has_section('{{ section }}')):
+  drbdmanage_config.add_section('{{ section }}')
+  needs_save = True
+{% endif %}
+
+{% for key, value in options.items() %}
+if(not drbdmanage_config.has_option('{{ section }}', '{{ key }}') or drbdmanage_config.get('{{ section }}', '{{ key }}') not in [ '{{ value }}' ] ):
+  drbdmanage_config.set('{{ section }}', '{{ key }}', '{{ value }}')
+  needs_save = True
+{% endfor %}
+{% endfor %}
+
+print('###### drbdmanage with settings from ansible')
+print_drbdmanageconfig(drbdmanage_config)
+
+if(needs_save):
+  with open(drbdmanage_config_file, 'w') as configfile:
+    drbdmanage_config.write(configfile)
+

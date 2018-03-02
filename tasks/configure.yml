@@ -1,0 +1,8 @@
+---
+# FIXME for now without template
+- name: drbdmanage_configure_drbd_global_common_conf_usage_count
+  lineinfile: dest=/etc/drbd.d/global_common.conf regexp="^\s*usage-count\s+.*$"  line="        usage-count {{drbdmanage_m.drbd_global_common_options.usagecount}};" 
+
+- name: drbdmanage_configure_drbd_global_common_conf_quorum
+  lineinfile: path="/etc/drbd.d/global_common.conf" regexp="^\s*#\s*quorum\s+.*$|^\s*quorum\s+.*$"  line="                quorum {{ drbdmanage_m.drbd_global_common_options.quorum }};" 
+  when: drbdmanage_m.drbd_global_common_options.quorum not in [ 'off' ]

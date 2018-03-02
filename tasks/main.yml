@@ -1,0 +1,23 @@
+---
+- name: drbdmanage_include_os_specific_vars
+  include_vars: "{{ item }}"
+  with_first_found:
+   - "{{ ansible_distribution }}.yml"
+   - "{{ ansible_os_family }}.yml"
+
+- name: drbdmanage_merge_defaults_dict_with_inventory_dict
+  set_fact: 
+     drbdmanage_m: "{{ drbdmanage_d|combine(drbdmanage, recursive=True) }}"
+
+- name: fact_drbdmanage_deploy_node
+  set_fact:
+    drbdmanage_deploy_node: "{{ groups['drbdmanage_servers'][0] }}"
+
+- name: fact_drbdmanage_additional_nodes
+  set_fact:
+    drbdmanage_additional_nodes: "{{ groups['drbdmanage_servers'][1:] }}"
+
+- include_tasks: install.yml
+- include_tasks: configure.yml
+- include_tasks: service.yml
+- include_tasks: init.yml

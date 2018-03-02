@@ -1,0 +1,89 @@
+---
+- name: fact_drbdmanage_init_is_done
+  stat:
+    path: /etc/drbd.d/drbdctrl.res
+  register: drbdmanage_init_is_done
+  when: 
+    - inventory_hostname in [ drbdmanage_deploy_node ] 
+
+- name: fact_drbdmanage_add_is_done
+  stat:
+    path: /etc/drbd.d/drbdctrl.res
+  register: drbdmanage_add_is_done
+  when: 
+    - inventory_hostname in drbdmanage_additional_nodes 
+
+- name: drbdmanage_modifyconfig_editor_template
+  template:
+    src: templates/drbdmanage_modify-config_editor
+    dest: /usr/sbin/drbdmanage_modify-config_editor
+    owner: root
+    group: root
+    mode: 0755
+  when: 
+    - inventory_hostname in [ drbdmanage_deploy_node ] 
+
+- name: drbdmanage_init_{{ inventory_hostname }}
+  shell: "drbdmanage init -q {{ drbd_ip }}"
+  when: 
+    - inventory_hostname in [ drbdmanage_deploy_node ] 
+    - not drbdmanage_init_is_done.stat.exists
+
+- name: drbdmanage_addnode_{{ inventory_hostname }}_on_{{ drbdmanage_deploy_node }}
+  shell: "drbdmanage add-node -q {{ inventory_hostname }} {{ drbd_ip }}"
+  ignore_errors: True
+  delegate_to: "{{ drbdmanage_deploy_node }}" 
+  when: 
+    - inventory_hostname in drbdmanage_additional_nodes
+    - not drbdmanage_add_is_done.stat.exists
+
+- name: drbdmanage_waitforstartup_{{ inventory_hostname }}_after_adding
+  shell: drbdmanage wait-for-startup
+  when: 
+    - inventory_hostname in drbdmanage_additional_nodes
+    - not drbdmanage_add_is_done.stat.exists
+
+- name: drbdmanage_wait_until_control_volume_is_in_sync_{{ inventory_hostname }}
+  shell: > 
+    drbdadm status .drbdctrl |grep -A2 {{inventory_hostname}}|grep peer-disk|while read line; do echo $line|grep -q UpToDate || echo 1 ;done ;echo 0
+  register: drbdadm_both_control_volumes_are_up_to_date
+  until: drbdadm_both_control_volumes_are_up_to_date.stdout in [ "0" ]
+  retries: 10
+  delay: 10
+  delegate_to: "{{ drbdmanage_deploy_node }}"
+  when: 
+    - inventory_hostname in drbdmanage_additional_nodes
+    - not drbdmanage_add_is_done.stat.exists
+
+- name: drbdadm_adjust_{{ item }}
+  shell: drbdadm adjust -v all
+  ignore_errors: True
+  delegate_to: "{{ item }}"
+  with_items: "{{ drbdmanage_additional_nodes }}"
+  when: 
+    - inventory_hostname in drbdmanage_additional_nodes
+    - not drbdmanage_add_is_done.stat.exists
+
+#- name: drbdmanage_restart_{{ inventory_hostname }}
+#  shell: drbdmanage restart -c -q
+#  when: 
+#    - inventory_hostname in drbdmanage_additional_nodes
+#    - not drbdmanage_add_is_done.stat.exists
+
+- name: drbdmanage_waitforstartup_{{ inventory_hostname }}_after_restarting
+  shell: drbdmanage wait-for-startup
+  when: 
+    - inventory_hostname in drbdmanage_additional_nodes
+    - not drbdmanage_add_is_done.stat.exists
+
+- name: drbdmanage_modify-config_{{ inventory_hostname }}_on_{{ drbdmanage_deploy_node }}
+  environment:
+    "EDITOR": /usr/sbin/drbdmanage_modify-config_editor
+  shell: drbdmanage modify-config --node {{ inventory_hostname }}
+  delegate_to: "{{ drbdmanage_deploy_node }}" 
+
+- name: drbdmanage_reconfigure_{{ inventory_hostname }}
+  shell: drbdmanage reconfigure
+
+- name: drbdmanage_update-pool_{{ inventory_hostname }}
+  shell: drbdmanage update-pool

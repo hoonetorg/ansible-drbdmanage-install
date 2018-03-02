@@ -1,0 +1,5 @@
+---
+drbdmanage_d:
+  drbd_global_common_options:
+    usagecount: "yes"
+    quorum: "off"

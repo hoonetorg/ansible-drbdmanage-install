@@ -1,0 +1,6 @@
+---
+- name: drbdmanage__install_pkgs
+  package:
+   name: "{{drbdmanage_m.pkgs}}"
+   state: present
+ 
